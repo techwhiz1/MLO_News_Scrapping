@@ -1,0 +1,21 @@
+Collecting pinecone
+  Downloading pinecone-8.1.2-py3-none-any.whl (742 kB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 742.8/742.8 kB 19.2 MB/s eta 0:00:00
+Requirement already satisfied: certifi>=2019.11.17 in ./venv/lib/python3.11/site-packages (from pinecone) (2026.1.4)
+Collecting orjson>=3.11.6
+  Downloading orjson-3.11.8-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (133 kB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 133.6/133.6 kB 26.1 MB/s eta 0:00:00
+Collecting pinecone-plugin-assistant<4.0.0,>=3.0.1
+  Downloading pinecone_plugin_assistant-3.0.3-py3-none-any.whl (280 kB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 280.7/280.7 kB 36.3 MB/s eta 0:00:00
+Collecting pinecone-plugin-interface<0.1.0,>=0.0.7
+  Using cached pinecone_plugin_interface-0.0.7-py3-none-any.whl (6.2 kB)
+Requirement already satisfied: python-dateutil>=2.5.3 in ./venv/lib/python3.11/site-packages (from pinecone) (2.9.0.post0)
+Requirement already satisfied: typing-extensions>=3.7.4 in ./venv/lib/python3.11/site-packages (from pinecone) (4.15.0)
+Requirement already satisfied: urllib3>=1.26.0 in ./venv/lib/python3.11/site-packages (from pinecone) (2.6.3)
+Requirement already satisfied: requests<3.0.0,>=2.32.3 in ./venv/lib/python3.11/site-packages (from pinecone-plugin-assistant<4.0.0,>=3.0.1->pinecone) (2.32.5)
+Requirement already satisfied: six>=1.5 in ./venv/lib/python3.11/site-packages (from python-dateutil>=2.5.3->pinecone) (1.17.0)
+Requirement already satisfied: charset_normalizer<4,>=2 in ./venv/lib/python3.11/site-packages (from requests<3.0.0,>=2.32.3->pinecone-plugin-assistant<4.0.0,>=3.0.1->pinecone) (3.4.3)
+Requirement already satisfied: idna<4,>=2.5 in ./venv/lib/python3.11/site-packages (from requests<3.0.0,>=2.32.3->pinecone-plugin-assistant<4.0.0,>=3.0.1->pinecone) (3.10)
+Installing collected packages: pinecone-plugin-interface, orjson, pinecone-plugin-assistant, pinecone
+Successfully installed orjson-3.11.8 pinecone-8.1.2 pinecone-plugin-assistant-3.0.3 pinecone-plugin-interface-0.0.7
