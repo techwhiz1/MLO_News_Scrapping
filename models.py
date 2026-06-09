@@ -166,6 +166,7 @@ class ResumeScoreRequest(BaseModel):
     """Request model for resume scoring API"""
     document_id: str
     url: str
+    job_ids: List[str] = Field(..., min_length=1)
 
 
 class ScoreResult(BaseModel):
@@ -275,6 +276,14 @@ class ProductFacetSearchRequest(BaseModel):
         description="Optional Pinecone namespace override",
     )
     include_metadata: bool = True
+    field_rerank: Optional[bool] = Field(
+        default=None,
+        description="Override Pinecone field reranking for semantic product search",
+    )
+    rank_fields: Optional[List[str]] = Field(
+        default=None,
+        description="Ordered product fields used by Pinecone rerank; earlier fields have higher priority",
+    )
 
 
 class ProductSearchHit(BaseModel):

@@ -27,7 +27,7 @@ if [ $? -eq 0 ]; then
     echo ""
     echo "🧪 Test your APIs:"
     echo "curl -X POST 'https://news.mininglifeserver.com/jobs/score' -H 'Content-Type: application/json' -d '{\"job_id\": \"test\"}'"
-    echo "curl -X POST 'https://news.mininglifeserver.com/resumes/score' -H 'Content-Type: application/json' -d '{\"document_id\": \"test\", \"url\": \"https://example.com/resume.pdf\"}'"
+    echo "curl -X POST 'https://news.mininglifeserver.com/resumes/score' -H 'Content-Type: application/json' -d '{\"document_id\": \"test\", \"url\": \"https://example.com/resume.pdf\", \"job_ids\": [\"test\"]}'"
 else
     echo "❌ Database connection test failed!"
     echo "Please check your database configuration."

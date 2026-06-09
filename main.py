@@ -384,17 +384,18 @@ async def score_job_against_resumes(request: JobScoreRequest):
 
 @app.post("/resumes/score", response_model=ResumeScoreResponse)
 async def score_resume_against_jobs(request: ResumeScoreRequest):
-    """Score a specific resume against all jobs"""
+    """Score a specific resume against selected jobs"""
     try:
         logging.info(f"Starting resume scoring for document_id: {request.document_id}")
         
         # Get database session
         db = next(get_db())
         
-        # Score resume against all jobs
+        # Score resume against selected jobs
         scores = await scoring_service.score_resume_against_jobs(
             request.document_id, 
             request.url, 
+            request.job_ids,
             db
         )
         
@@ -405,6 +406,13 @@ async def score_resume_against_jobs(request: ResumeScoreRequest):
             total_jobs=len(scores)
         )
         
+    except ValueError as e:
+        logging.error(f"Invalid resume scoring request: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+
     except Exception as e:
         logging.error(f"Error in resume scoring: {str(e)}")
         raise HTTPException(

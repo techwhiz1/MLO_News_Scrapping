@@ -45,12 +45,12 @@ class EventScraper:
             if not self.crawler:
                 self.crawler = AsyncWebCrawler(verbose=True)
             
-            # Extract all event URLs from the list page
-            print(f"Extracting event URLs from: {event_list_url}")
-            event_urls = await self._extract_event_urls(event_list_url)
-            print(f"Found {len(event_urls)} event URLs")
+            # Extract all event URLs and thumbnails from the list page
+            print(f"Extracting event URLs and thumbnails from: {event_list_url}")
+            event_data = await self._extract_event_urls(event_list_url)
+            print(f"Found {len(event_data)} events with thumbnails")
             
-            if not event_urls:
+            if not event_data:
                 return EventScrapingResponse(
                     events=[],
                     total_events=0,
@@ -58,7 +58,7 @@ class EventScraper:
                 )
             
             # Scrape events concurrently up to max_events limit
-            events = await self._scrape_events_concurrently(event_urls, max_events)
+            events = await self._scrape_events_concurrently(event_data, max_events)
             
             return EventScrapingResponse(
                 events=events,
@@ -69,8 +69,8 @@ class EventScraper:
         except Exception as e:
             raise Exception(f"Error scraping events: {str(e)}")
     
-    async def _extract_event_urls(self, list_url: str) -> List[str]:
-        """Extract all event URLs from the event list page"""
+    async def _extract_event_urls(self, list_url: str) -> List[Dict[str, str]]:
+        """Extract all event URLs and thumbnails from the event list page"""
         try:
             crawler_config = CrawlerRunConfig(
                 cache_mode=CacheMode.BYPASS,
@@ -96,19 +96,8 @@ class EventScraper:
             for element in body.find_all(['header', 'footer', 'nav']):
                 element.decompose()
             
-            # Remove elements with header/footer/nav in class or id
-            # for element in body.find_all(['div', 'section'], class_=lambda x: x and any(
-            #     keyword in str(x).lower() for keyword in ['header', 'footer', 'nav', 'menu', 'navbar']
-            # )):
-            #     element.decompose()
-            
-            # for element in body.find_all(['div', 'section'], id=lambda x: x and any(
-            #     keyword in str(x).lower() for keyword in ['header', 'footer', 'nav', 'menu', 'navbar']
-            # )):
-            #     element.decompose()
-            
-            # Extract all links containing "event" in href (excluding PDF files)
-            event_links = []
+            # Extract event cards with URLs and thumbnails
+            event_data = []
             all_links = body.find_all('a', href=True)
             
             for link in all_links:
@@ -139,63 +128,107 @@ class EventScraper:
                     if 'event-submission' in full_url.lower():
                         continue
                     
-                    if full_url not in event_links:
-                        event_links.append(full_url)
+                    # Extract thumbnail image from the event card
+                    thumbnail_url = self._extract_thumbnail_from_card(link, list_url)
+                    
+                    # Check if we already have this URL
+                    if not any(ed['url'] == full_url for ed in event_data):
+                        event_data.append({
+                            'url': full_url,
+                            'thumbnail': thumbnail_url
+                        })
             
-            print(f"Found {len(event_links)} event URLs from list page")
-            return event_links
+            print(f"Found {len(event_data)} event URLs with thumbnails from list page")
+            return event_data
             
         except Exception as e:
             print(f"Error extracting event URLs: {str(e)}")
             return []
     
-    async def _scrape_events_concurrently(self, event_urls: List[str], max_events: int) -> List[EventDetails]:
+    def _extract_thumbnail_from_card(self, card_element, base_url: str) -> Optional[str]:
+        """Extract thumbnail image from an event card element"""
+        try:
+            # Look for picture element (most modern approach)
+            picture = card_element.find('picture')
+            if picture:
+                # Try to get img from picture
+                img = picture.find('img')
+                if img and img.get('src'):
+                    src = img.get('src')
+                    return urljoin(base_url, src)
+                
+                # Fallback: get first source's srcset
+                source = picture.find('source')
+                if source and source.get('srcset'):
+                    srcset = source.get('srcset')
+                    # Extract first URL from srcset (before space or comma)
+                    img_url = srcset.split()[0].split(',')[0]
+                    return urljoin(base_url, img_url)
+            
+            # Fallback: look for img directly in card
+            img = card_element.find('img')
+            if img and img.get('src'):
+                src = img.get('src')
+                return urljoin(base_url, src)
+            
+            # Fallback: look for data-src (lazy loading)
+            if img and img.get('data-src'):
+                src = img.get('data-src')
+                return urljoin(base_url, src)
+            
+            return None
+            
+        except Exception as e:
+            print(f"Error extracting thumbnail: {str(e)}")
+            return None
+    
+    async def _scrape_events_concurrently(self, event_data: List[Dict[str, str]], max_events: int) -> List[EventDetails]:
         """Scrape multiple events concurrently, stopping once max_events are collected"""
         events: List[EventDetails] = []
         seen_urls = set()  # Track seen URLs to prevent duplicates
-        total_urls = len(event_urls)
+        total_events_count = len(event_data)
         index = 0
         max_concurrent = 5  # Limit concurrent requests
         current_time = datetime.now()
         
-        print(f"Preparing to scrape up to {max_events} events from {total_urls} event URLs")
+        print(f"Preparing to scrape up to {max_events} events from {total_events_count} event URLs")
         
-        while index < total_urls and len(events) < max_events:
+        while index < total_events_count and len(events) < max_events:
             remaining_needed = max_events - len(events)
-            batch_size = min(max_concurrent, remaining_needed, total_urls - index)
-            batch_urls = event_urls[index : index + batch_size]
+            batch_size = min(max_concurrent, remaining_needed, total_events_count - index)
+            batch_data = event_data[index : index + batch_size]
             index += batch_size
             
             # Filter out already seen URLs
-            batch_urls = [url for url in batch_urls if url not in seen_urls]
-            if not batch_urls:
+            batch_data = [ed for ed in batch_data if ed['url'] not in seen_urls]
+            if not batch_data:
                 continue
             
-            print(f"Scraping batch of {len(batch_urls)} events (collected so far: {len(events)})")
+            print(f"Scraping batch of {len(batch_data)} events (collected so far: {len(events)})")
             
             semaphore = asyncio.Semaphore(max_concurrent)
             
-            async def scrape_with_semaphore(url: str) -> Optional[EventDetails]:
+            async def scrape_with_semaphore(event_dict: Dict[str, str]) -> Optional[EventDetails]:
                 async with semaphore:
                     try:
-                        return await self._scrape_single_event(url)
+                        return await self._scrape_single_event(event_dict['url'], event_dict.get('thumbnail'))
                     except Exception as e:
-                        print(f"Error scraping event {url}: {str(e)}")
+                        print(f"Error scraping event {event_dict['url']}: {str(e)}")
                         return None
             
-            tasks = [scrape_with_semaphore(url) for url in batch_urls]
+            tasks = [scrape_with_semaphore(ed) for ed in batch_data]
             batch_results = await asyncio.gather(*tasks, return_exceptions=True)
             
-            for url, result in zip(batch_urls, batch_results):
+            for event_dict, result in zip(batch_data, batch_results):
                 # Mark URL as seen
-                seen_urls.add(url)
+                seen_urls.add(event_dict['url'])
                 
                 if isinstance(result, Exception):
-                    print(f"Exception in event scraping for {url}: {str(result)}")
+                    print(f"Exception in event scraping for {event_dict['url']}: {str(result)}")
                     continue
                 
                 if result is None:
-                    print(f"No event data extracted from {url}; skipping")
+                    print(f"No event data extracted from {event_dict['url']}; skipping")
                     continue
                 
                 if isinstance(result, EventDetails):
@@ -213,7 +246,7 @@ class EventScraper:
         
         return events
     
-    async def _scrape_single_event(self, event_url: str) -> Optional[EventDetails]:
+    async def _scrape_single_event(self, event_url: str, list_thumbnail: Optional[str] = None) -> Optional[EventDetails]:
         """Scrape a single event"""
         try:
             # Create crawler config with wait time for JavaScript rendering
@@ -264,7 +297,10 @@ class EventScraper:
                 date_time_str = str(date_time_str).strip()
             
             # Get image and video URLs
-            image_url = extracted_data.get('image_url') or (structured_content.get('primary_image') if structured_content else None)
+            # Prefer thumbnail from list page, fallback to extracted image URL, then to primary image from content
+            image_url = (list_thumbnail or 
+                        extracted_data.get('image_url') or 
+                        (structured_content.get('primary_image') if structured_content else None))
             video_url = extracted_data.get('video_url') or (structured_content.get('primary_video') if structured_content else None)
             
             # Ensure speakers is a list

@@ -36,7 +36,8 @@ def test_resume_scoring_api():
     url = "http://localhost:8889/resumes/score"
     data = {
         "document_id": "test_doc_123",
-        "url": "https://example.com/sample_resume.pdf"
+        "url": "https://example.com/sample_resume.pdf",
+        "job_ids": ["test_job_123"]
     }
     
     try:

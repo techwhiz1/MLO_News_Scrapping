@@ -65,12 +65,13 @@ No authentication required for current endpoints.
 
 ### 5. Resume Scoring (NEW)
 - **POST** `/resumes/score`
-- **Description**: Score a specific resume against all jobs and save results to database
+- **Description**: Score a specific resume against selected jobs and save results to database
 - **Request Body**:
 ```json
 {
   "document_id": "doc_123",
-  "url": "https://example.com/resume.pdf"
+  "url": "https://example.com/resume.pdf",
+  "job_ids": ["job_456"]
 }
 ```
 - **Response**:
@@ -87,6 +88,35 @@ No authentication required for current endpoints.
 }
 ```
 - **Database**: Scores are automatically saved to `ResumeJobScore` table
+
+### 6. Semantic Search
+- **POST** `/semantic-search`
+- **Description**: Semantic vector search across jobs, news, and products. The API expands query meaning before searching, so brand/common-name requests like "please give me bobcats" can retrieve products indexed as "Skid Steer" or "Compact Loader" even when the literal word is not present.
+- **Request Body**:
+```json
+{
+  "query": "please give me bobcats",
+  "top_k": 10,
+  "indexes": ["products"]
+}
+```
+- **Response**:
+```json
+{
+  "query": "please give me bobcats",
+  "results": [
+    {
+      "id": "product_123",
+      "score": 0.91,
+      "index": "products",
+      "metadata": {
+        "name": "Skid Steer Loader"
+      }
+    }
+  ],
+  "total": 1
+}
+```
 
 ## Database Schema
 
@@ -188,6 +218,16 @@ pm2 start ecosystem.config.js
 ## Environment Variables
 
 - `OPENAI_API_KEY`: OpenAI API key for scoring functionality
+- `OPENAI_EMBEDDING_MODEL`: Embedding model used for Pinecone query vectors. This must match the model family used when vectors were indexed.
+- `EMBEDDING_DIM`: Embedding vector dimensions. This must match the Pinecone index dimension.
+- `SEMANTIC_QUERY_EXPANSION_ENABLED`: Enables LLM query rewriting for semantic search. Default: `True`.
+- `SEMANTIC_QUERY_EXPANSION_MODEL`: OpenAI model used to rewrite semantic search queries. Default: `gpt-5-mini`.
+- `SEMANTIC_MAX_QUERY_VARIANTS`: Maximum query variants embedded per semantic search. Default: `4`.
+- `SEMANTIC_CANDIDATE_MULTIPLIER`: Extra Pinecone candidates fetched before reranking. Default: `3`.
+- `SEMANTIC_RERANK_ENABLED`: Enables LLM reranking of vector candidates by meaning. Default: `True`.
+- `SEMANTIC_RERANK_MODEL`: OpenAI model used for reranking. Default: same as query expansion model.
+- `SEMANTIC_RERANK_MAX_CANDIDATES`: Maximum fused candidates reranked per request. Default: `30`.
+- `SEMANTIC_RERANK_WEIGHT`: Weight given to reranker score versus vector score. Default: `0.7`.
 - Database connection is configured in `database.py`
 
 ## Monitoring
@@ -195,4 +235,3 @@ pm2 start ecosystem.config.js
 - Check PM2 status: `pm2 status`
 - View logs: `pm2 logs news-events-scraper`
 - Restart service: `pm2 restart news-events-scraper`
-

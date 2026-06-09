@@ -1,3 +1,16 @@
+const fs = require('fs');
+const path = require('path');
+
+// Load .env file
+const envPath = path.resolve(__dirname, '.env');
+const envVars = {};
+if (fs.existsSync(envPath)) {
+  fs.readFileSync(envPath, 'utf8').split('\n').forEach(line => {
+    const match = line.match(/^([^#=]+)=(.*)$/);
+    if (match) envVars[match[1].trim()] = match[2].trim();
+  });
+}
+
 module.exports = {
   apps: [{
     name: 'news-events-scraper',
@@ -10,7 +23,7 @@ module.exports = {
     max_memory_restart: '1G',
     env: {
       NODE_ENV: 'production',
-      OPENAI_API_KEY: process.env.OPENAI_API_KEY || ''
+      ...envVars
     },
     error_file: './logs/err.log',
     out_file: './logs/out.log',

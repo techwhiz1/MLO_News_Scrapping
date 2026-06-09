@@ -2,7 +2,7 @@ import asyncio
 import json
 import io
 import os
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from openai import OpenAI
 from database import get_db, EmployeeProfile, JobPost, ResumeJobScore
 from models import ScoreResult
@@ -156,9 +156,10 @@ Return only a number between 0 and 100.
             print(f"Error in OpenAI scoring: {e}")
             return 50  # Default score on error
     
-    def save_scores_to_database(self, scores: List[ScoreResult], db) -> bool:
+    def save_scores_to_database(self, scores: List[ScoreResult], db, total_jobs: Optional[int] = None) -> bool:
         """Save scores to ResumeJobScore table"""
         try:
+            total_jobs = total_jobs if total_jobs is not None else len(scores)
             for score_result in scores:
                 # Check if score already exists
                 existing_score = db.query(ResumeJobScore).filter(
@@ -169,13 +170,15 @@ Return only a number between 0 and 100.
                 if existing_score:
                     # Update existing score
                     existing_score.score = score_result.score
+                    existing_score.totalJobs = total_jobs
                     print(f"Updated score for document {score_result.document_id} and job {score_result.job_id}: {score_result.score}")
                 else:
                     # Create new score record
                     new_score = ResumeJobScore(
                         document_id=score_result.document_id,
                         job_id=score_result.job_id,
-                        score=score_result.score
+                        score=score_result.score,
+                        totalJobs=total_jobs
                     )
                     db.add(new_score)
                     print(f"Saved new score for document {score_result.document_id} and job {score_result.job_id}: {score_result.score}")
@@ -253,8 +256,8 @@ Return only a number between 0 and 100.
             print(f"Error in job scoring: {e}")
             raise
     
-    async def score_resume_against_jobs(self, document_id: str, resume_url: str, db) -> List[ScoreResult]:
-        """Score a specific resume against all jobs"""
+    async def score_resume_against_jobs(self, document_id: str, resume_url: str, job_ids: List[str], db) -> List[ScoreResult]:
+        """Score a specific resume against selected jobs"""
         try:
             # Test database connection first
             try:
@@ -262,18 +265,27 @@ Return only a number between 0 and 100.
                 db.execute(text("SELECT 1"))
             except Exception as db_error:
                 raise Exception(f"Database connection failed: {db_error}")
+
+            requested_job_ids = list(dict.fromkeys(job_id.strip() for job_id in job_ids if job_id and job_id.strip()))
+            if not requested_job_ids:
+                raise ValueError("At least one valid job_id is required")
             
             # Get resume content
             resume_content = await self.get_resume_content(resume_url)
             if not resume_content:
                 raise Exception("Could not fetch resume content")
             
-            # Get all jobs
-            jobs = db.query(JobPost).all()
+            # Get requested jobs only
+            jobs = db.query(JobPost).filter(JobPost.jobId.in_(requested_job_ids)).all()
+            jobs_by_id = {job.jobId: job for job in jobs}
+            missing_job_ids = [job_id for job_id in requested_job_ids if job_id not in jobs_by_id]
+            if missing_job_ids:
+                raise ValueError(f"Jobs not found: {', '.join(missing_job_ids)}")
             
             scores = []
             
-            for job in jobs:
+            for job_id in requested_job_ids:
+                job = jobs_by_id[job_id]
                 try:
                     job_description = self.create_job_description(job)
                     
@@ -294,11 +306,10 @@ Return only a number between 0 and 100.
             
             # Save scores to database
             if scores:
-                self.save_scores_to_database(scores, db)
+                self.save_scores_to_database(scores, db, total_jobs=len(requested_job_ids))
             
             return scores
             
         except Exception as e:
             print(f"Error in resume scoring: {e}")
             raise
-
