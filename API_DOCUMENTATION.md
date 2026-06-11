@@ -74,6 +74,7 @@ No authentication required for current endpoints.
   "job_ids": ["job_456"]
 }
 ```
+- `job_ids` must contain `JobPost.id` values.
 - **Response**:
 ```json
 {

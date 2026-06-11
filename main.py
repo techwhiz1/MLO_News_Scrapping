@@ -386,7 +386,11 @@ async def score_job_against_resumes(request: JobScoreRequest):
 async def score_resume_against_jobs(request: ResumeScoreRequest):
     """Score a specific resume against selected jobs"""
     try:
-        logging.info(f"Starting resume scoring for document_id: {request.document_id}")
+        logging.info(
+            "Starting resume scoring for document_id: %s, job_ids: %s",
+            request.document_id,
+            request.job_ids,
+        )
         
         # Get database session
         db = next(get_db())

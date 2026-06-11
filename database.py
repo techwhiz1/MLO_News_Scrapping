@@ -16,7 +16,27 @@ except ImportError:
 
 # Database configuration
 # Use environment variable or default to provided URL
-from urllib.parse import quote_plus
+from urllib.parse import quote_plus, urlparse
+
+def _load_dotenv(path: str = ".env") -> None:
+    """Load simple KEY=VALUE pairs from .env without overriding process env."""
+    if not os.path.exists(path):
+        return
+
+    with open(path, "r", encoding="utf-8") as env_file:
+        for raw_line in env_file:
+            line = raw_line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+
+            key, value = line.split("=", 1)
+            key = key.strip()
+            value = value.strip().strip('"').strip("'")
+            if key:
+                os.environ.setdefault(key, value)
+
+
+_load_dotenv()
 
 # Default connection parameters
 DEFAULT_DB_USER = "mlo_user"
@@ -26,7 +46,7 @@ DEFAULT_DB_PORT = "5432"
 DEFAULT_DB_NAME = "MLOdb"
 
 # Get DATABASE_URL from environment or construct it
-raw_database_url = os.getenv("DATABASE_URL")
+raw_database_url = os.getenv("DATABASE_URL") or os.getenv("PRODUCT_CATALOG_DATABASE_URL")
 
 if raw_database_url:
     # If DATABASE_URL is provided, check if password needs encoding
@@ -82,6 +102,16 @@ else:
 # Final check: ensure we're using postgresql:// not postgres://
 if DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+
+try:
+    parsed_database_url = urlparse(DATABASE_URL)
+    print(
+        "Database target: "
+        f"{parsed_database_url.scheme}://{parsed_database_url.hostname}:"
+        f"{parsed_database_url.port}/{parsed_database_url.path.lstrip('/')}"
+    )
+except Exception:
+    print("Database target: unable to parse DATABASE_URL")
 
 # Create engine with connection pooling and error handling
 try:
@@ -218,4 +248,3 @@ else:
     except Exception as e:
         print(f"⚠️ Database connection test failed: {e}")
         print("The application will continue but database operations may fail.")
-

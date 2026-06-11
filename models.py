@@ -166,7 +166,11 @@ class ResumeScoreRequest(BaseModel):
     """Request model for resume scoring API"""
     document_id: str
     url: str
-    job_ids: List[str] = Field(..., min_length=1)
+    job_ids: List[str] = Field(
+        ...,
+        min_length=1,
+        description="JobPost.id values to score this resume against",
+    )
 
 
 class ScoreResult(BaseModel):

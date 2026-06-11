@@ -4,6 +4,7 @@ import io
 import os
 from typing import List, Dict, Any, Optional
 from openai import OpenAI
+from sqlalchemy import String, cast, text
 from database import get_db, EmployeeProfile, JobPost, ResumeJobScore
 from models import ScoreResult
 import httpx
@@ -198,13 +199,12 @@ Return only a number between 0 and 100.
         try:
             # Test database connection first
             try:
-                from sqlalchemy import text
                 db.execute(text("SELECT 1"))
             except Exception as db_error:
                 raise Exception(f"Database connection failed: {db_error}")
             
             # Get job details
-            job = db.query(JobPost).filter(JobPost.jobId == job_id).first()
+            job = db.query(JobPost).filter(cast(JobPost.id, String) == job_id).first()
             if not job:
                 raise Exception(f"Job with ID {job_id} not found")
             
@@ -261,7 +261,6 @@ Return only a number between 0 and 100.
         try:
             # Test database connection first
             try:
-                from sqlalchemy import text
                 db.execute(text("SELECT 1"))
             except Exception as db_error:
                 raise Exception(f"Database connection failed: {db_error}")
@@ -276,11 +275,18 @@ Return only a number between 0 and 100.
                 raise Exception("Could not fetch resume content")
             
             # Get requested jobs only
-            jobs = db.query(JobPost).filter(JobPost.jobId.in_(requested_job_ids)).all()
-            jobs_by_id = {job.jobId: job for job in jobs}
+            print(f"Resume scoring requested JobPost.id values: {requested_job_ids}")
+            jobs = db.query(JobPost).filter(cast(JobPost.id, String).in_(requested_job_ids)).all()
+            jobs_by_id = {str(job.id): job for job in jobs}
+            matched_job_ids = list(jobs_by_id.keys())
             missing_job_ids = [job_id for job_id in requested_job_ids if job_id not in jobs_by_id]
             if missing_job_ids:
-                raise ValueError(f"Jobs not found: {', '.join(missing_job_ids)}")
+                raise ValueError(
+                    "Jobs not found by JobPost.id: "
+                    f"{', '.join(missing_job_ids)}. "
+                    f"Requested: {requested_job_ids}. "
+                    f"Matched: {matched_job_ids}"
+                )
             
             scores = []
             
@@ -294,14 +300,14 @@ Return only a number between 0 and 100.
                     
                     scores.append(ScoreResult(
                         document_id=document_id,
-                        job_id=job.jobId,
+                        job_id=str(job.id),
                         score=score
                     ))
                     
-                    print(f"Scored resume {document_id} against job {job.jobId}: {score}")
+                    print(f"Scored resume {document_id} against job {job.id}: {score}")
                     
                 except Exception as e:
-                    print(f"Error processing job {job.jobId}: {e}")
+                    print(f"Error processing job {job.id}: {e}")
                     continue
             
             # Save scores to database
